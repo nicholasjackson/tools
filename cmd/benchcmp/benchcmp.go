@@ -20,7 +20,7 @@ var (
 	changedOnly = flag.Bool("changed", false, "show only benchmarks that have changed")
 	magSort     = flag.Bool("mag", false, "sort benchmarks by magnitude of change")
 	best        = flag.Bool("best", false, "compare best times from old and new")
-	tolerance   = flag.Float64("tolerance", math.MaxFloat64, "fail if tolerance outside given value")
+	tolerance   = flag.Float64("tolerance", math.MaxFloat64, "return error if a delta is outside given value")
 )
 
 const usageFooter = `
@@ -78,7 +78,7 @@ func main() {
 		}
 
 		if delta := cmp.DeltaNsPerOp(); !*changedOnly || delta.Changed() {
-			if toleranceEcceeded(delta, *tolerance) {
+			if toleranceExceeded(delta, *tolerance) {
 				tolerance_exceeded = true
 			}
 
@@ -99,7 +99,7 @@ func main() {
 			continue
 		}
 		if delta := cmp.DeltaMBPerS(); !*changedOnly || delta.Changed() {
-			if toleranceEcceeded(delta, *tolerance) {
+			if toleranceExceeded(delta, *tolerance) {
 				tolerance_exceeded = true
 			}
 
@@ -120,7 +120,7 @@ func main() {
 			continue
 		}
 		if delta := cmp.DeltaAllocsPerOp(); !*changedOnly || delta.Changed() {
-			if toleranceEcceeded(delta, *tolerance) {
+			if toleranceExceeded(delta, *tolerance) {
 				tolerance_exceeded = true
 			}
 
@@ -141,7 +141,7 @@ func main() {
 			continue
 		}
 		if delta := cmp.DeltaAllocedBytesPerOp(); !*changedOnly || delta.Changed() {
-			if toleranceEcceeded(delta, *tolerance) {
+			if toleranceExceeded(delta, *tolerance) {
 				tolerance_exceeded = true
 			}
 
@@ -209,6 +209,6 @@ func formatNs(ns float64) string {
 	return strconv.FormatFloat(ns, 'f', prec, 64)
 }
 
-func toleranceEcceeded(delta Delta, tolerance float64) bool {
+func toleranceExceeded(delta Delta, tolerance float64) bool {
 	return delta.Float64() > (tolerance / 100.0)
 }
