@@ -34,7 +34,7 @@ benchcmp will also compare memory allocations.
 `
 
 func main() {
-	tolerance_exceeded := false
+	toleranceFail := false
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "usage: %s old.txt new.txt\n\n", os.Args[0])
@@ -79,7 +79,7 @@ func main() {
 
 		if delta := cmp.DeltaNsPerOp(); !*changedOnly || delta.Changed() {
 			if toleranceExceeded(delta, *tolerance) {
-				tolerance_exceeded = true
+				toleranceFail = true
 			}
 
 			if !header {
@@ -100,7 +100,7 @@ func main() {
 		}
 		if delta := cmp.DeltaMBPerS(); !*changedOnly || delta.Changed() {
 			if toleranceExceeded(delta, *tolerance) {
-				tolerance_exceeded = true
+				toleranceFail = true
 			}
 
 			if !header {
@@ -121,7 +121,7 @@ func main() {
 		}
 		if delta := cmp.DeltaAllocsPerOp(); !*changedOnly || delta.Changed() {
 			if toleranceExceeded(delta, *tolerance) {
-				tolerance_exceeded = true
+				toleranceFail = true
 			}
 
 			if !header {
@@ -142,7 +142,7 @@ func main() {
 		}
 		if delta := cmp.DeltaAllocedBytesPerOp(); !*changedOnly || delta.Changed() {
 			if toleranceExceeded(delta, *tolerance) {
-				tolerance_exceeded = true
+				toleranceFail = true
 			}
 
 			if !header {
@@ -153,7 +153,7 @@ func main() {
 		}
 	}
 
-	if tolerance_exceeded {
+	if toleranceFail {
 		fatal(fmt.Sprintf("Tolerance %.2f%% for one or more benchmarks exceeded", *tolerance))
 	}
 }
@@ -210,5 +210,5 @@ func formatNs(ns float64) string {
 }
 
 func toleranceExceeded(delta Delta, tolerance float64) bool {
-	return delta.Float64() > (tolerance / 100.0)
+	return (delta.Float64()*100 - 100) > (tolerance)
 }
