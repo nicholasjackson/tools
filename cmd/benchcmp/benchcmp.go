@@ -7,6 +7,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"sort"
 	"strconv"
@@ -19,6 +20,7 @@ var (
 	changedOnly = flag.Bool("changed", false, "show only benchmarks that have changed")
 	magSort     = flag.Bool("mag", false, "sort benchmarks by magnitude of change")
 	best        = flag.Bool("best", false, "compare best times from old and new")
+	tolerance   = flag.Float64("tolerance", math.MaxFloat64, "fail if tolerance outside given value")
 )
 
 const usageFooter = `
@@ -32,6 +34,8 @@ benchcmp will also compare memory allocations.
 `
 
 func main() {
+	tolerance_exceeded := false
+
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "usage: %s old.txt new.txt\n\n", os.Args[0])
 		flag.PrintDefaults()
@@ -49,6 +53,7 @@ func main() {
 	cmps, warnings := Correlate(before, after)
 
 	for _, warn := range warnings {
+		fmt.Println(warn)
 		fmt.Fprintln(os.Stderr, warn)
 	}
 
@@ -71,7 +76,12 @@ func main() {
 		if !cmp.Measured(parse.NsPerOp) {
 			continue
 		}
+
 		if delta := cmp.DeltaNsPerOp(); !*changedOnly || delta.Changed() {
+			if toleranceEcceeded(delta, *tolerance) {
+				tolerance_exceeded = true
+			}
+
 			if !header {
 				fmt.Fprint(w, "benchmark\told ns/op\tnew ns/op\tdelta\n")
 				header = true
@@ -89,6 +99,10 @@ func main() {
 			continue
 		}
 		if delta := cmp.DeltaMBPerS(); !*changedOnly || delta.Changed() {
+			if toleranceEcceeded(delta, *tolerance) {
+				tolerance_exceeded = true
+			}
+
 			if !header {
 				fmt.Fprint(w, "\nbenchmark\told MB/s\tnew MB/s\tspeedup\n")
 				header = true
@@ -106,6 +120,10 @@ func main() {
 			continue
 		}
 		if delta := cmp.DeltaAllocsPerOp(); !*changedOnly || delta.Changed() {
+			if toleranceEcceeded(delta, *tolerance) {
+				tolerance_exceeded = true
+			}
+
 			if !header {
 				fmt.Fprint(w, "\nbenchmark\told allocs\tnew allocs\tdelta\n")
 				header = true
@@ -123,12 +141,20 @@ func main() {
 			continue
 		}
 		if delta := cmp.DeltaAllocedBytesPerOp(); !*changedOnly || delta.Changed() {
+			if toleranceEcceeded(delta, *tolerance) {
+				tolerance_exceeded = true
+			}
+
 			if !header {
 				fmt.Fprint(w, "\nbenchmark\told bytes\tnew bytes\tdelta\n")
 				header = true
 			}
 			fmt.Fprintf(w, "%s\t%d\t%d\t%s\n", cmp.Name(), cmp.Before.AllocedBytesPerOp, cmp.After.AllocedBytesPerOp, cmp.DeltaAllocedBytesPerOp().Percent())
 		}
+	}
+
+	if tolerance_exceeded {
+		fatal(fmt.Sprintf("Tolerance %.2f%% for one or more benchmarks exceeded", *tolerance))
 	}
 }
 
@@ -181,4 +207,8 @@ func formatNs(ns float64) string {
 		prec = 1
 	}
 	return strconv.FormatFloat(ns, 'f', prec, 64)
+}
+
+func toleranceEcceeded(delta Delta, tolerance float64) bool {
+	return delta.Float64() > (tolerance / 100.0)
 }
